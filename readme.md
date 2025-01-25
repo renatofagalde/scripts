@@ -1,6 +1,6 @@
 # Scripts
 
 ## Location
-``shell
+```shell
 /usr/local/bin
-``
+```
