@@ -1,6 +1,21 @@
-# Vive em: itau-um3-app-wshandler/local/docker-compose.yml
-# Os repos irmãos estão dois níveis acima (../../ a partir de local/).
+# itau-um3-app-wshandler/local/docker-compose.yml
+# Módulo Go de cada repo está em <repo>/app/ (go.mod lá) -> context aponta p/ app/.
 name: um-local
+
+# ---- blocos reaproveitados (edite GOPRIVATE aqui, 1 lugar só) --------------
+x-go-args: &go_args
+  GOPRIVATE_GLOB: github.com/SEU-ORG/*     # pegue do `module` em qualquer app/go.mod
+
+x-aws-env: &aws_env
+  AWS_ENDPOINT_URL: "http://localstack:4566"
+  AWS_ACCESS_KEY_ID: "test"
+  AWS_SECRET_ACCESS_KEY: "test"
+  AWS_REGION: "us-east-1"
+  VALKEY_ADDR: "valkey:6379"
+
+x-infra-ready: &infra_ready
+  localstack: { condition: service_healthy }
+  valkey:     { condition: service_healthy }
 
 services:
   localstack:
@@ -8,7 +23,7 @@ services:
     ports:
       - "4566:4566"
     environment:
-      SERVICES: "sqs,s3,ssm"       # ajuste ao que os apps realmente usam
+      SERVICES: "sqs,s3,ssm"
       DEBUG: "0"
     volumes:
       - "./localstack/init:/etc/localstack/init/ready.d"
@@ -29,64 +44,53 @@ services:
       timeout: 3s
       retries: 5
 
-  # --- Apps de pano de fundo (sobem no `up` default) ------------------------
+  historic:
+    build:
+      context: ../../itau-um3-app-historic/app
+      dockerfile: Dockerfile
+      args:
+        <<: *go_args
+        CMD_PATH: ./cmd/app          # confirme: find app/cmd -name main.go
+      secrets: [gh_token]
+    depends_on: *infra_ready
+    environment: *aws_env
+
+  authorizer:
+    build:
+      context: ../../itau-um3-app-iumessenger-lambda-authorizer-websocket/app
+      dockerfile: Dockerfile
+      args:
+        <<: *go_args
+        CMD_PATH: ./cmd/app
+      secrets: [gh_token]
+    depends_on: *infra_ready
+    environment: *aws_env
 
   pushnotification:
     build:
-      context: ../../itau-um3-app-pushnotification
+      context: ../../itau-um3-app-pushnotification/app
       dockerfile: Dockerfile
       args:
-        CMD_PATH: ./app            # confirme onde está o main.go
-        GOPRIVATE_GLOB: github.com/SEU-ORG/*
+        <<: *go_args
+        CMD_PATH: ./cmd/app
       secrets: [gh_token]
-    depends_on:
-      localstack: { condition: service_healthy }
-      valkey:     { condition: service_healthy }
-    environment:
-      AWS_ENDPOINT_URL: "http://localstack:4566"
-      AWS_ACCESS_KEY_ID: "test"
-      AWS_SECRET_ACCESS_KEY: "test"
-      AWS_REGION: "us-east-1"
-      VALKEY_ADDR: "valkey:6379"
+    depends_on: *infra_ready
+    environment: *aws_env
 
-  # Descomente se precisar do authorizer no fluxo:
-  # authorizer:
-  #   build:
-  #     context: ../../itau-um3-app-iumessenger-lambda-authorizer-websocket
-  #     dockerfile: Dockerfile
-  #     args: { CMD_PATH: ./app, GOPRIVATE_GLOB: github.com/SEU-ORG/* }
-  #     secrets: [gh_token]
-  #   depends_on:
-  #     localstack: { condition: service_healthy }
-  #     valkey:     { condition: service_healthy }
-  #   environment:
-  #     AWS_ENDPOINT_URL: "http://localstack:4566"
-  #     AWS_REGION: "us-east-1"
-  #     AWS_ACCESS_KEY_ID: "test"
-  #     AWS_SECRET_ACCESS_KEY: "test"
-  #     VALKEY_ADDR: "valkey:6379"
-
-  # --- wshandler: só sobe com --profile full (default = você debuga no GoLand)
-
+  # wshandler: só sobe com --profile full (default = você debuga no GoLand)
   wshandler:
     profiles: ["full"]
     build:
-      context: ..                  # a raiz do próprio repo wshandler
+      context: ../app
       dockerfile: Dockerfile
       args:
-        CMD_PATH: ./app
-        GOPRIVATE_GLOB: github.com/SEU-ORG/*
+        <<: *go_args
+        CMD_PATH: ./cmd/app
       secrets: [gh_token]
     depends_on:
-      localstack:       { condition: service_healthy }
-      valkey:           { condition: service_healthy }
+      <<: *infra_ready
       pushnotification: { condition: service_started }
-    environment:
-      AWS_ENDPOINT_URL: "http://localstack:4566"
-      AWS_ACCESS_KEY_ID: "test"
-      AWS_SECRET_ACCESS_KEY: "test"
-      AWS_REGION: "us-east-1"
-      VALKEY_ADDR: "valkey:6379"
+    environment: *aws_env
 
 secrets:
   gh_token:
