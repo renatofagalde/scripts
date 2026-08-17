@@ -1,0 +1,10 @@
+# Coloque na raiz de CADA repo Go. O wshandler tem vários hs_err_pid*.log
+# (crash dumps do GoLand/JVM) que só incham o build context — fora daqui.
+.git
+*.log
+hs_err_pid*.log
+local/
+docs/
+*.md
+Dockerfile
+.dockerignore
