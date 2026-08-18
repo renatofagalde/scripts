@@ -1,10 +1,7 @@
 # itau-um3-app-wshandler/local/docker-compose.yml
-# Módulo Go de cada repo está em <repo>/app/ (go.mod lá) -> context aponta p/ app/.
+# Build 100% offline: cada app compila a partir de <repo>/app/vendor/.
+# Sem token, sem GOPRIVATE, sem GitHub. Rode `go mod vendor` antes.
 name: um-local
-
-# ---- blocos reaproveitados (edite GOPRIVATE aqui, 1 lugar só) --------------
-x-go-args: &go_args
-  GOPRIVATE_GLOB: github.com/SEU-ORG/*     # pegue do `module` em qualquer app/go.mod
 
 x-aws-env: &aws_env
   AWS_ENDPOINT_URL: "http://localstack:4566"
@@ -48,10 +45,7 @@ services:
     build:
       context: ../../itau-um3-app-historic/app
       dockerfile: Dockerfile
-      args:
-        <<: *go_args
-        CMD_PATH: ./cmd/app          # confirme: find app/cmd -name main.go
-      secrets: [gh_token]
+      args: { CMD_PATH: ./cmd/app }        # confirme: find app/cmd -name main.go
     depends_on: *infra_ready
     environment: *aws_env
 
@@ -59,10 +53,7 @@ services:
     build:
       context: ../../itau-um3-app-iumessenger-lambda-authorizer-websocket/app
       dockerfile: Dockerfile
-      args:
-        <<: *go_args
-        CMD_PATH: ./cmd/app
-      secrets: [gh_token]
+      args: { CMD_PATH: ./cmd/app }
     depends_on: *infra_ready
     environment: *aws_env
 
@@ -70,10 +61,7 @@ services:
     build:
       context: ../../itau-um3-app-pushnotification/app
       dockerfile: Dockerfile
-      args:
-        <<: *go_args
-        CMD_PATH: ./cmd/app
-      secrets: [gh_token]
+      args: { CMD_PATH: ./cmd/app }
     depends_on: *infra_ready
     environment: *aws_env
 
@@ -83,15 +71,8 @@ services:
     build:
       context: ../app
       dockerfile: Dockerfile
-      args:
-        <<: *go_args
-        CMD_PATH: ./cmd/app
-      secrets: [gh_token]
+      args: { CMD_PATH: ./cmd/app }
     depends_on:
       <<: *infra_ready
       pushnotification: { condition: service_started }
     environment: *aws_env
-
-secrets:
-  gh_token:
-    file: ./gh_token.txt
