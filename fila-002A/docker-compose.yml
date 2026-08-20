@@ -11,7 +11,7 @@ x-aws-creds: &aws_creds
   AWS_ENDPOINT_URL: "http://localstack:4566"
   AWS_ACCESS_KEY_ID: "test"
   AWS_SECRET_ACCESS_KEY: "test"
-  AWS_REGION: "us-east-1"
+  AWS_REGION: "sa-east-1"
 
 x-infra-ready: &infra_ready
   localstack: { condition: service_healthy }
@@ -56,7 +56,7 @@ services:
       <<: *aws_creds
       ENV: "local"
       DATAMESH_QUEUE_URL: "http://localstack:4566/000000000000/datamesh-queue"
-      DYNAMODB_MESSAGE_TABLE_NAME: "007"
+      DYNAMODB_MESSAGE_TABLE_NAME: "tbum3007_mens_central"   # <<< confirme o nome completo
 
   pushnotification:
     build:
@@ -96,7 +96,7 @@ services:
       URL_VALKEYCLUSTER: "valkey:6379"
       VALKEY_PASSWORD: ""
       # --- storage (wshandler não bate no dynamo direto; valor só pra config não faltar) ---
-      AWS_DYNAMODB_TABLE: "007"
+      AWS_DYNAMODB_TABLE: "tbum3007_mens_central"   # <<< mesmo nome do historic
       AWS_APIGATEWAY_ENDPOINT: "http://localstack:4566"   # PostToConnection falha no Community (só afeta envio)
       # --- downstream/STS: dummy (fora do path da sessão) ---
       STS_URL: "http://host.docker.internal:9999/sts"
