@@ -56,3 +56,44 @@ shopt -u nullglob
 printf '\n\n===> Salvo em: %s\n' "$OUT"
 printf '===> O bloco "environment na infra" costuma ter a lista REAL de\n'
 printf '     variaveis que o app recebe em prod — use como gabarito.\n'
+
+
+--
+
+#!/usr/bin/env bash
+# scan-getenv.sh
+# Rode a partir de ~/IdeaProjects:  bash scan-getenv.sh
+# (ou passe o caminho base:         bash scan-getenv.sh /c/Users/user/IdeaProjects)
+#
+# Lista APENAS os os.Getenv("...") de cada repo itau-um3-* (sem mapstructure,
+# viper, infra ou qualquer outro ruído de config).
+
+set -uo pipefail
+
+BASE="${1:-.}"
+OUT="getenv-scan.txt"
+: > "$OUT"
+
+shopt -s nullglob
+found=0
+for repo in "$BASE"/itau-um3-*; do
+  [ -d "$repo" ] || continue
+  found=1
+
+  printf '\n===== %s =====\n' "$(basename "$repo")" | tee -a "$OUT"
+
+  # lista deduplicada dos nomes lidos via os.Getenv
+  grep -rhoE --include=*.go --exclude-dir=vendor \
+    'os\.Getenv\("[^"]+"\)' "$repo" 2>/dev/null \
+    | sort -u | tee -a "$OUT" || true
+done
+shopt -u nullglob
+
+if [ "$found" -eq 0 ]; then
+  printf "Nenhum diretorio itau-um3-* encontrado em '%s'.\n" "$BASE" | tee -a "$OUT"
+  printf "Rode a partir de ~/IdeaProjects ou passe o caminho base como argumento.\n"
+  exit 1
+fi
+
+printf '\n===> Salvo em: %s\n' "$OUT"
+printf '===> Para ver ARQUIVO:LINHA em vez da lista, troque -rhoE por -rnE.\n'
