@@ -1,0 +1,12 @@
+# Vai DENTRO de cada <repo>/app/ (raiz do build context).
+# Crash dumps do GoLand ficam na raiz do repo, fora daqui, então nem precisa
+# listá-los. Aqui é só higiene do módulo Go.
+.git
+*.log
+bin/
+dist/
+*.test
+*.out
+coverage*
+Dockerfile
+.dockerignore

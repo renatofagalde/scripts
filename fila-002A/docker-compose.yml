@@ -7,13 +7,6 @@ networks:
   default:
     name: um3-net
 
-x-otel-off: &otel_off
-  DD_TRACE_ENABLED: "false"
-  OTEL_SDK_DISABLED: "true"
-  OTEL_TRACES_EXPORTER: "none"
-  OTEL_METRICS_EXPORTER: "none"
-  OTEL_LOGS_EXPORTER: "none"
-
 x-aws-creds: &aws_creds
   AWS_ENDPOINT_URL: "http://localstack:4566"
   AWS_ACCESS_KEY_ID: "test"
@@ -60,7 +53,7 @@ services:
     depends_on: *infra_ready
     extra_hosts: *host_bridge
     environment:
-      <<: [*aws_creds, *otel_off]
+      <<: *aws_creds
       ENV: "local"
       DATAMESH_QUEUE_URL: "http://localstack:4566/000000000000/datamesh-queue"
       DYNAMODB_MESSAGE_TABLE_NAME: "007"
@@ -73,7 +66,7 @@ services:
     depends_on: *infra_ready
     extra_hosts: *host_bridge
     environment:
-      <<: [*aws_creds, *otel_off]
+      <<: *aws_creds
       ENV: "local"
       # tudo downstream/externo -> dummy (não existe local)
       APIGWID_APICONTAS: "local"
@@ -95,7 +88,7 @@ services:
     extra_hosts: *host_bridge
     ports: ["8080:8080"]
     environment:
-      <<: [*aws_creds, *otel_off]
+      <<: *aws_creds
       ENV: "local"
       # --- cache/sessão local (o que importa pro teu fluxo) ---
       USE_LOCAL_CACHE: "true"
