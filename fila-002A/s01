@@ -1,5 +1,10 @@
-
-
 for r in wshandler historic pushnotification; do
-  (cd itau-um3-app-$r/app && go mod vendor) && echo "ok: $r"
+  echo ">>> INICIANDO: itau-um3-app-$r"
+  if (cd itau-um3-app-$r/app && go mod vendor); then
+    echo "<<< OK: itau-um3-app-$r"
+  else
+    echo "!!! ERRO em: itau-um3-app-$r — parando aqui"
+    break
+  fi
+  echo "----------------------------------------"
 done
