@@ -1,0 +1,17 @@
+# syntax=docker/dockerfile:1.7
+# Dockerfile.local — GENÉRICO e IDÊNTICO em cada <repo>/app/.
+# NÃO coloque env aqui: config vem do compose (runtime). Aqui só builda o binário.
+# Build 100% offline a partir de vendor/ (rode `go mod vendor` uma vez no host).
+
+FROM golang:1.22-alpine AS build
+RUN apk add --no-cache ca-certificates
+ARG CMD_PATH=./cmd/app
+ENV CGO_ENABLED=0 GOFLAGS=-mod=vendor GOPROXY=off
+WORKDIR /src
+COPY . .
+RUN go build -trimpath -o /out/app ${CMD_PATH}
+
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates
+COPY --from=build /out/app /app
+ENTRYPOINT ["/app"]

@@ -1,0 +1,117 @@
+# itau-um3-app-wshandler/local/docker-compose.yml
+# Rede um3-net (criada pelo compose): serviços se enxergam pelo NOME.
+# Env vem daqui (runtime), NÃO do Dockerfile.local (que é genérico/idêntico nos apps).
+name: um-local
+
+networks:
+  default:
+    name: um3-net
+
+x-otel-off: &otel_off
+  DD_TRACE_ENABLED: "false"
+  OTEL_SDK_DISABLED: "true"
+  OTEL_TRACES_EXPORTER: "none"
+  OTEL_METRICS_EXPORTER: "none"
+  OTEL_LOGS_EXPORTER: "none"
+
+x-aws-creds: &aws_creds
+  AWS_ENDPOINT_URL: "http://localstack:4566"
+  AWS_ACCESS_KEY_ID: "test"
+  AWS_SECRET_ACCESS_KEY: "test"
+  AWS_REGION: "us-east-1"
+
+x-infra-ready: &infra_ready
+  localstack: { condition: service_healthy }
+  valkey:     { condition: service_healthy }
+
+x-host-bridge: &host_bridge
+  - "host.docker.internal:host-gateway"
+
+services:
+  localstack:
+    image: localstack/localstack:3
+    ports: ["4566:4566"]
+    environment:
+      SERVICES: "sqs,dynamodb,s3,ssm"
+      DEBUG: "0"
+    volumes:
+      - "./localstack/init:/etc/localstack/init/ready.d"
+    healthcheck:
+      test: ["CMD", "awslocal", "sqs", "list-queues"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    ports: ["6379:6379"]
+    command: valkey-server --save "" --appendonly no
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  historic:
+    build:
+      context: ../../itau-um3-app-historic/app
+      dockerfile: Dockerfile.local
+      args: { CMD_PATH: ./cmd/app }        # confirme o caminho do main.go
+    depends_on: *infra_ready
+    extra_hosts: *host_bridge
+    environment:
+      <<: [*aws_creds, *otel_off]
+      ENV: "local"
+      DATAMESH_QUEUE_URL: "http://localstack:4566/000000000000/datamesh-queue"
+      DYNAMODB_MESSAGE_TABLE_NAME: "007"
+
+  pushnotification:
+    build:
+      context: ../../itau-um3-app-pushnotification/app
+      dockerfile: Dockerfile.local
+      args: { CMD_PATH: ./cmd/app }
+    depends_on: *infra_ready
+    extra_hosts: *host_bridge
+    environment:
+      <<: [*aws_creds, *otel_off]
+      ENV: "local"
+      # tudo downstream/externo -> dummy (não existe local)
+      APIGWID_APICONTAS: "local"
+      APIGWID_APIPESSOAS: "local"
+      URL_APICONTAS: "http://host.docker.internal:9999"
+      URL_APIPESSOAS: "http://host.docker.internal:9999"
+      URL_EK7: "http://host.docker.internal:9999"
+      client_id: "local"
+
+  # wshandler: --profile full (containerizado). Pra DEBUG, rode no GoLand (env localhost).
+  wshandler:
+    profiles: ["full"]
+    build:
+      context: ../app
+      dockerfile: Dockerfile.local
+      args: { CMD_PATH: ./cmd/app }
+    depends_on:
+      <<: *infra_ready
+    extra_hosts: *host_bridge
+    ports: ["8080:8080"]
+    environment:
+      <<: [*aws_creds, *otel_off]
+      ENV: "local"
+      # --- cache/sessão local (o que importa pro teu fluxo) ---
+      USE_LOCAL_CACHE: "true"
+      TEST_REDIS_URL: "valkey:6379"
+      URL_VALKEYCLUSTER: "valkey:6379"
+      VALKEY_PASSWORD: ""
+      # --- storage (wshandler não bate no dynamo direto; valor só pra config não faltar) ---
+      AWS_DYNAMODB_TABLE: "007"
+      AWS_APIGATEWAY_ENDPOINT: "http://localstack:4566"   # PostToConnection falha no Community (só afeta envio)
+      # --- downstream/STS: dummy (fora do path da sessão) ---
+      STS_URL: "http://host.docker.internal:9999/sts"
+      CHANNEL_STS_URL_VALIDATION: "http://host.docker.internal:9999/sts"
+      STS_CLIENT_ID: "local"
+      STS_CLIENT_SECRET: "local"
+      URL_CONTROLEACESSO: "http://host.docker.internal:9999"
+      URL_HISTORYSERVICE: "http://host.docker.internal:9999"   # se historic servir HTTP: http://historic:8080
+      CONVERSATIONUI_URL: "http://host.docker.internal:9999"
+      IA_BASE_URL: "http://host.docker.internal:9999"
+      IA_APIKEY: "local"
